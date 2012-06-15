@@ -13,8 +13,8 @@
         '(clojure.asm.commons Method GeneratorAdapter)
         '(clojure.lang IPersistentMap))
 
-;(defn method-sig [^java.lang.reflect.Method meth]
-;  [(. meth (getName)) (seq (. meth (getParameterTypes)))])
+(defn method-sig [^java.lang.reflect.Method meth]
+  [(. meth (getName)) (seq (. meth (getParameterTypes))) (. meth getReturnType)])
 
 (defn- non-private-methods [^Class c]
   (loop [mm {}

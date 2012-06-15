@@ -8,6 +8,12 @@
 
 (in-ns 'clojure.core)
 
+(import
+ '(clojure.asm ClassWriter ClassVisitor Opcodes Type) 
+ '(java.lang.reflect Modifier Constructor)
+ '(clojure.asm.commons Method GeneratorAdapter)
+ '(clojure.lang IProxy Reflector DynamicClassLoader IPersistentMap PersistentHashMap RT))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;; definterface ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn namespace-munge

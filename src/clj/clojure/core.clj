@@ -1563,98 +1563,6 @@
           (first valid-keys)
           (map #(str ", " %) (rest valid-keys)))))))
 
-;;multimethods
-(def global-hierarchy)
-
-(defmacro defmulti
-  "Creates a new multimethod with the associated dispatch function.
-  The docstring and attribute-map are optional.
-
-  Options are key-value pairs and may be one of:
-    :default    the default dispatch value, defaults to :default
-    :hierarchy  the isa? hierarchy to use for dispatching
-                defaults to the global hierarchy"
-  {:arglists '([name docstring? attr-map? dispatch-fn & options])
-   :added "1.0"}
-  [mm-name & options]
-  (let [docstring   (if (string? (first options))
-                      (first options)
-                      nil)
-        options     (if (string? (first options))
-                      (next options)
-                      options)
-        m           (if (map? (first options))
-                      (first options)
-                      {})
-        options     (if (map? (first options))
-                      (next options)
-                      options)
-        dispatch-fn (first options)
-        options     (next options)
-        m           (if docstring
-                      (assoc m :doc docstring)
-                      m)
-        m           (if (meta mm-name)
-                      (conj (meta mm-name) m)
-                      m)]
-    (when (= (count options) 1)
-      (throw (Exception. "The syntax for defmulti has changed. Example: (defmulti name dispatch-fn :default dispatch-value)")))
-    (let [options   (apply hash-map options)
-          default   (get options :default :default)
-          hierarchy (get options :hierarchy #'global-hierarchy)]
-      (check-valid-options options :default :hierarchy)
-      `(let [v# (def ~mm-name)]
-         (when-not (and (.hasRoot v#) (instance? clojure.lang.MultiFn (deref v#)))
-           (def ~(with-meta mm-name m)
-                (new clojure.lang.MultiFn ~(name mm-name) ~dispatch-fn ~default ~hierarchy)))))))
-
-(defmacro defmethod
-  "Creates and installs a new method of multimethod associated with dispatch-value. "
-  {:added "1.0"}
-  [multifn dispatch-val & fn-tail]
-  `(. ~(with-meta multifn {:tag 'clojure.lang.MultiFn}) addMethod ~dispatch-val (fn ~@fn-tail)))
-
-(defn remove-all-methods
-  "Removes all of the methods of multimethod."
-  {:added "1.2"
-   :static true} 
- [^clojure.lang.MultiFn multifn]
- (.reset multifn))
-
-(defn remove-method
-  "Removes the method of multimethod associated with dispatch-value."
-  {:added "1.0"
-   :static true}
- [^clojure.lang.MultiFn multifn dispatch-val]
- (. multifn removeMethod dispatch-val))
-
-(defn prefer-method
-  "Causes the multimethod to prefer matches of dispatch-val-x over dispatch-val-y 
-   when there is a conflict"
-  {:added "1.0"
-   :static true}
-  [^clojure.lang.MultiFn multifn dispatch-val-x dispatch-val-y]
-  (. multifn preferMethod dispatch-val-x dispatch-val-y))
-
-(defn methods
-  "Given a multimethod, returns a map of dispatch values -> dispatch fns"
-  {:added "1.0"
-   :static true}
-  [^clojure.lang.MultiFn multifn] (.getMethodTable multifn))
-
-(defn get-method
-  "Given a multimethod and a dispatch value, returns the dispatch fn
-  that would apply to that value, or nil if none apply and no default"
-  {:added "1.0"
-   :static true}
-  [^clojure.lang.MultiFn multifn dispatch-val] (.getMethod multifn dispatch-val))
-
-(defn prefers
-  "Given a multimethod, returns a map of preferred value -> set of other values"
-  {:added "1.0"
-   :static true}
-  [^clojure.lang.MultiFn multifn] (.getPreferTable multifn))
-
 ;;;;;;;;; var stuff
 
 (defmacro ^{:private true} assert-args
@@ -3255,85 +3163,7 @@
        (number? x) (BigDecimal/valueOf (long x))
        :else (BigDecimal. x)))
 
-(def ^:dynamic ^{:private true} print-initialized false)
-
-(defmulti print-method (fn [x writer]
-                         (let [t (get (meta x) :type)]
-                           (if (keyword? t) t (class x)))))
-(defmulti print-dup (fn [x writer] (class x)))
-
-(defn pr-on
-  {:private true
-   :static true}
-  [x w]
-  (if *print-dup*
-    (print-dup x w)
-    (print-method x w))
-  nil)
-
-(defn pr
-  "Prints the object(s) to the output stream that is the current value
-  of *out*.  Prints the object(s), separated by spaces if there is
-  more than one.  By default, pr and prn print in a way that objects
-  can be read by the reader"
-  {:dynamic true
-   :added "1.0"}
-  ([] nil)
-  ([x]
-     (pr-on x *out*))
-  ([x & more]
-   (pr x)
-   (. *out* (append \space))
-   (if-let [nmore (next more)]
-     (recur (first more) nmore)
-     (apply pr more))))
-
-(def ^:private ^String system-newline
-     (System/getProperty "line.separator"))
-
-(defn newline
-  "Writes a platform-specific newline to *out*"
-  {:added "1.0"
-   :static true}
-  []
-    (. *out* (append system-newline))
-    nil)
-
-(defn flush
-  "Flushes the output stream that is the current value of
-  *out*"
-  {:added "1.0"
-   :static true}
-  []
-    (. *out* (flush))
-    nil)
-
-(defn prn
-  "Same as pr followed by (newline). Observes *flush-on-newline*"
-  {:added "1.0"
-   :static true}
-  [& more]
-    (apply pr more)
-    (newline)
-    (when *flush-on-newline*
-      (flush)))
-
-(defn print
-  "Prints the object(s) to the output stream that is the current value
-  of *out*.  print and println produce output for human consumption."
-  {:added "1.0"
-   :static true}
-  [& more]
-    (binding [*print-readably* nil]
-      (apply pr more)))
-
-(defn println
-  "Same as print followed by (newline)"
-  {:added "1.0"
-   :static true}
-  [& more]
-    (binding [*print-readably* nil]
-      (apply prn more)))
+(declare println pr pr-str prn print print-str flush newline)
 
 (defn read
   "Reads the next object from stream, which must be an instance of
@@ -4196,42 +4026,6 @@
   `(with-open [s# (-> (java.io.StringReader. ~s) clojure.lang.LineNumberingPushbackReader.)]
      (binding [*in* s#]
        ~@body)))
-
-(defn pr-str
-  "pr to a string, returning it"
-  {:tag String
-   :added "1.0"
-   :static true}
-  [& xs]
-    (with-out-str
-     (apply pr xs)))
-
-(defn prn-str
-  "prn to a string, returning it"
-  {:tag String
-   :added "1.0"
-   :static true}
-  [& xs]
-  (with-out-str
-   (apply prn xs)))
-
-(defn print-str
-  "print to a string, returning it"
-  {:tag String
-   :added "1.0"
-   :static true}
-  [& xs]
-    (with-out-str
-     (apply print xs)))
-
-(defn println-str
-  "println to a string, returning it"
-  {:tag String
-   :added "1.0"
-   :static true}
-  [& xs]
-    (with-out-str
-     (apply println xs)))
 
 (import clojure.lang.ExceptionInfo)
 (defn ex-info
@@ -6028,15 +5822,225 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; helper files ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (alter-meta! (find-ns 'clojure.core) assoc :doc "Fundamental library of the Clojure language")
-(load "core_proxy")
-(load "core_print")
-(load "genclass")
 (load "core_deftype")
+(load "genclass")
 (load "core/protocols")
+(load "core_proxy")
+
+;;multimethods
+(def global-hierarchy)
+
+(defmacro defmulti
+  "Creates a new multimethod with the associated dispatch function.
+  The docstring and attribute-map are optional.
+
+  Options are key-value pairs and may be one of:
+    :default    the default dispatch value, defaults to :default
+    :hierarchy  the isa? hierarchy to use for dispatching
+                defaults to the global hierarchy"
+  {:arglists '([name docstring? attr-map? dispatch-fn & options])
+   :added "1.0"}
+  [mm-name & options]
+  (let [docstring   (if (string? (first options))
+                      (first options)
+                      nil)
+        options     (if (string? (first options))
+                      (next options)
+                      options)
+        m           (if (map? (first options))
+                      (first options)
+                      {})
+        options     (if (map? (first options))
+                      (next options)
+                      options)
+        dispatch-fn (first options)
+        options     (next options)
+        m           (if docstring
+                      (assoc m :doc docstring)
+                      m)
+        m           (if (meta mm-name)
+                      (conj (meta mm-name) m)
+                      m)]
+    (when (= (count options) 1)
+      (throw (Exception. "The syntax for defmulti has changed. Example: (defmulti name dispatch-fn :default dispatch-value)")))
+    (let [options   (apply hash-map options)
+          default   (get options :default :default)
+          hierarchy (get options :hierarchy #'global-hierarchy)]
+      (check-valid-options options :default :hierarchy)
+      `(let [v# (def ~mm-name)]
+         (when-not (and (.hasRoot v#) (instance? clojure.lang.MultiFn (deref v#)))
+           (def ~(with-meta mm-name m)
+                (new clojure.lang.MultiFn ~(name mm-name) ~dispatch-fn ~default ~hierarchy)))))))
+
+(defmacro defmethod
+  "Creates and installs a new method of multimethod associated with dispatch-value. "
+  {:added "1.0"}
+  [multifn dispatch-val & fn-tail]
+  `(. ~(with-meta multifn {:tag 'clojure.lang.MultiFn}) addMethod ~dispatch-val (fn ~@fn-tail)))
+
+(defn remove-all-methods
+  "Removes all of the methods of multimethod."
+  {:added "1.2"
+   :static true} 
+ [^clojure.lang.MultiFn multifn]
+ (.reset multifn))
+
+(defn remove-method
+  "Removes the method of multimethod associated with dispatch-value."
+  {:added "1.0"
+   :static true}
+ [^clojure.lang.MultiFn multifn dispatch-val]
+ (. multifn removeMethod dispatch-val))
+
+(defn prefer-method
+  "Causes the multimethod to prefer matches of dispatch-val-x over dispatch-val-y 
+   when there is a conflict"
+  {:added "1.0"
+   :static true}
+  [^clojure.lang.MultiFn multifn dispatch-val-x dispatch-val-y]
+  (. multifn preferMethod dispatch-val-x dispatch-val-y))
+
+(defn methods
+  "Given a multimethod, returns a map of dispatch values -> dispatch fns"
+  {:added "1.0"
+   :static true}
+  [^clojure.lang.MultiFn multifn] (.getMethodTable multifn))
+
+(defn get-method
+  "Given a multimethod and a dispatch value, returns the dispatch fn
+  that would apply to that value, or nil if none apply and no default"
+  {:added "1.0"
+   :static true}
+  [^clojure.lang.MultiFn multifn dispatch-val] (.getMethod multifn dispatch-val))
+
+(defn prefers
+  "Given a multimethod, returns a map of preferred value -> set of other values"
+  {:added "1.0"
+   :static true}
+  [^clojure.lang.MultiFn multifn] (.getPreferTable multifn))
+
+(def ^:dynamic ^{:private true} print-initialized false)
+
+(defmulti print-method (fn [x writer]
+                         (let [t (get (meta x) :type)]
+                           (if (keyword? t) t (class x)))))
+(defmulti print-dup (fn [x writer] (class x)))
+
+(load "core_print")
 (load "gvec")
 (load "instant")
 (load "uuid")
 
+(defn pr-on
+  {:private true
+   :static true}
+  [x w]
+  (if *print-dup*
+    (print-dup x w)
+    (print-method x w))
+  nil)
+
+(defn pr
+  "Prints the object(s) to the output stream that is the current value
+  of *out*.  Prints the object(s), separated by spaces if there is
+  more than one.  By default, pr and prn print in a way that objects
+  can be read by the reader"
+  {:dynamic true
+   :added "1.0"}
+  ([] nil)
+  ([x]
+     (pr-on x *out*))
+  ([x & more]
+   (pr x)
+   (. *out* (append \space))
+   (if-let [nmore (next more)]
+     (recur (first more) nmore)
+     (apply pr more))))
+
+(def ^:private ^String system-newline
+     (System/getProperty "line.separator"))
+
+(defn newline
+  "Writes a platform-specific newline to *out*"
+  {:added "1.0"
+   :static true}
+  []
+    (. *out* (append system-newline))
+    nil)
+
+(defn flush
+  "Flushes the output stream that is the current value of
+  *out*"
+  {:added "1.0"
+   :static true}
+  []
+    (. *out* (flush))
+    nil)
+
+(defn prn
+  "Same as pr followed by (newline). Observes *flush-on-newline*"
+  {:added "1.0"
+   :static true}
+  [& more]
+    (apply pr more)
+    (newline)
+    (when *flush-on-newline*
+      (flush)))
+
+(defn print
+  "Prints the object(s) to the output stream that is the current value
+  of *out*.  print and println produce output for human consumption."
+  {:added "1.0"
+   :static true}
+  [& more]
+    (binding [*print-readably* nil]
+      (apply pr more)))
+
+(defn println
+  "Same as print followed by (newline)"
+  {:added "1.0"
+   :static true}
+  [& more]
+    (binding [*print-readably* nil]
+      (apply prn more)))
+
+(defn pr-str
+  "pr to a string, returning it"
+  {:tag String
+   :added "1.0"
+   :static true}
+  [& xs]
+    (with-out-str
+     (apply pr xs)))
+
+(defn prn-str
+  "prn to a string, returning it"
+  {:tag String
+   :added "1.0"
+   :static true}
+  [& xs]
+  (with-out-str
+   (apply prn xs)))
+
+(defn print-str
+  "print to a string, returning it"
+  {:tag String
+   :added "1.0"
+   :static true}
+  [& xs]
+    (with-out-str
+     (apply print xs)))
+
+(defn println-str
+  "println to a string, returning it"
+  {:tag String
+   :added "1.0"
+   :static true}
+  [& xs]
+    (with-out-str
+     (apply println xs)))
+
+;; redefine reduce with internal-reduce
 (defn reduce
   "f should be a function of 2 arguments. If val is not supplied,
   returns the result of applying f to the first 2 items in coll, then

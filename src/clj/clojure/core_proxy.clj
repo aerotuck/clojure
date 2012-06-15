@@ -10,15 +10,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;; proxy ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(import
- '(clojure.asm ClassWriter ClassVisitor Opcodes Type) 
- '(java.lang.reflect Modifier Constructor)
- '(clojure.asm.commons Method GeneratorAdapter)
- '(clojure.lang IProxy Reflector DynamicClassLoader IPersistentMap PersistentHashMap RT))
-
-(defn method-sig [^java.lang.reflect.Method meth]
-  [(. meth (getName)) (seq (. meth (getParameterTypes))) (. meth getReturnType)])
-
 (defn- most-specific [rtypes]
   (or (some (fn [t] (when (every? #(isa? t %) rtypes) t)) rtypes)
     (throw (Exception. "Incompatible return types"))))
